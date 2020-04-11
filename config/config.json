@@ -1,0 +1,6 @@
+{
+  "development": {
+    "storage": "fsjstd-restapi.db",
+    "dialect": "sqlite"
+  }
+}
