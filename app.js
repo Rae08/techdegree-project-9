@@ -42,10 +42,19 @@ app.use((err, req, res, next) => {
     console.error(`Global error handler: ${JSON.stringify(err.stack)}`);
   }
 
-  res.status(err.status || 500).json({
-    message: err.message,
-    error: {},
-  });
+  if (err.name === "SequelizeValidationError") {
+    res.status(err.status || 400).json({
+      message: err.message,
+      error: {},
+    });
+  } else {
+    res.status(err.status || 500).json({
+      message: err.message,
+      error: {},
+    });
+  }
+
+
 });
 
 // set our port

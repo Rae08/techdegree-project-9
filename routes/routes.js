@@ -4,6 +4,10 @@ const bcryptjs = require("bcryptjs");
 const auth = require("basic-auth");
 const User = require("../models").User;
 const Course = require("../models").Course;
+const {
+  check,
+  validationResult
+} = require("express-validator/check");
 
 // async handler
 function asyncHandler(cb) {
@@ -46,9 +50,8 @@ const authenticateUser = asyncHandler(async (req, res, next) => {
   }
 
   if (message) {
-    console.warn(message);
-    res.status(400).json({
-      message: "Access Denied"
+    res.status(401).json({
+      message: "Access Denied",
     });
   }
 
@@ -79,7 +82,7 @@ router.get(
       }, ],
     });
     res.status(200).json({
-      courses
+      courses,
     });
   })
 );
@@ -96,49 +99,128 @@ router.get(
       }, ],
     });
     res.status(200).json({
-      course
+      course,
     });
   })
 );
 
 router.post(
-  "/users",
+  "/users", [check("firstName")
+    .exists({
+      checkNull: true,
+      checkFalsy: true
+    })
+    .withMessage('Please provide a value for "First Name"'),
+    check("lastName")
+    .exists({
+      checkNull: true,
+      checkFalsy: true
+    })
+    .withMessage('Please provide a value for "Last Name"'),
+    check("emailAddress")
+    .exists({
+      checkNull: true,
+      checkFalsy: true
+    })
+    .withMessage('Please provide a value for "Email Address"'),
+    check("password")
+    .exists({
+      checkNull: true,
+      checkFalsy: true
+    })
+    .withMessage('Please provide a value for "Password"')
+  ],
   asyncHandler(async (req, res) => {
-    const user = req.body;
-    user.password = bcryptjs.hashSync(user.password);
-    await User.create(user);
-    res.status(200).json({
-      message: "success!"
-    });
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      const errorMessages = errors.array().map(error => error.msg);
+      res.status(400).json({
+        errorMessages
+      })
+    } else {
+      const user = req.body;
+      user.password = bcryptjs.hashSync(user.password);
+      await User.create(user);
+      res.status(200).end();
+    }
   })
 );
 
 router.post(
-  "/courses",
+  "/courses", authenticateUser, [check("title")
+    .exists({
+      checkNull: true,
+      checkFalsy: true
+    })
+    .withMessage('Please provide a value for "Title"'),
+    check("description")
+    .exists({
+      checkNull: true,
+      checkFalsy: true
+    })
+    .withMessage('Please provide a value for "Description"')
+  ],
   asyncHandler(async (req, res) => {
-    const course = req.body;
-    await Course.create(course);
-    res.status(201).end();
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      const errorMessages = errors.array().map(error => error.msg);
+      res.status(400).json({
+        errorMessages
+      })
+    } else {
+      const course = req.body;
+      await Course.create(course);
+      res.status(201).end();
+    }
 
   })
 );
 
-router.put('/courses/:id', asyncHandler(async (req, res) => {
-  const course = await Course.update(req.body, {
-    where: {
-      id: req.params.id,
-    }
-  });
-  res.status(204).end();
-}))
 
-router.delete('/courses/:id', asyncHandler(async (req, res) => {
-  const course = await Course.destroy({
-    where: {
-      id: req.params.id,
+router.put(
+  "/courses/:id", authenticateUser, [check("title")
+    .exists({
+      checkNull: true,
+      checkFalsy: true
+    })
+    .withMessage('Please provide a value for "Title"'),
+    check("description")
+    .exists({
+      checkNull: true,
+      checkFalsy: true
+    })
+    .withMessage('Please provide a value for "Description"')
+  ],
+  asyncHandler(async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      const errorMessages = errors.array().map(error => error.msg);
+      res.status(400).json({
+        errorMessages
+      })
+    } else {
+
+      const course = await Course.update(req.body, {
+        where: {
+          id: req.params.id,
+        },
+      });
+      res.status(204).end();
     }
-  });
-  res.status(204).end();
-}))
+
+  })
+);
+
+router.delete(
+  "/courses/:id", authenticateUser,
+  asyncHandler(async (req, res) => {
+    const course = await Course.destroy({
+      where: {
+        id: req.params.id,
+      },
+    });
+    res.status(204).end();
+  })
+);
 
 module.exports = router;
