@@ -42,6 +42,7 @@ app.use((err, req, res, next) => {
     console.error(`Global error handler: ${JSON.stringify(err.stack)}`);
   }
 
+  // if this is a sequelize validation error, status code 400
   if (err.name === "SequelizeValidationError") {
     res.status(err.status || 400).json({
       message: err.message,

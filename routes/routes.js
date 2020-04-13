@@ -20,6 +20,7 @@ function asyncHandler(cb) {
   };
 }
 
+// authenticate user middlewear
 const authenticateUser = asyncHandler(async (req, res, next) => {
   let message = null;
   const credentials = auth(req);
@@ -58,6 +59,7 @@ const authenticateUser = asyncHandler(async (req, res, next) => {
   next();
 });
 
+// get user if authenticated
 router.get(
   "/users",
   authenticateUser,
@@ -73,12 +75,20 @@ router.get(
   })
 );
 
+
+// get courses (no authentication needed)
 router.get(
   "/courses",
   asyncHandler(async (req, res) => {
     const courses = await Course.findAll({
+      attributes: {
+        exclude: ['createdAt', 'updatedAt']
+      },
       include: [{
         model: User,
+        attributes: {
+          exclude: ['password', 'createdAt', 'updatedAt']
+        }
       }, ],
     });
     res.status(200).json({
@@ -87,6 +97,7 @@ router.get(
   })
 );
 
+// get course (no authentication needed)
 router.get(
   "/courses/:id",
   asyncHandler(async (req, res) => {
@@ -94,16 +105,29 @@ router.get(
       where: {
         id: req.params.id,
       },
+      attributes: {
+        exclude: ['createdAt', 'updatedAt']
+      },
       include: [{
         model: User,
+        attributes: {
+          exclude: ['password', 'createdAt', 'updatedAt']
+        }
       }, ],
     });
-    res.status(200).json({
-      course,
-    });
-  })
-);
+    if (course.length > 0) {
+      res.status(200).json({
+        course,
+      });
+    } else {
+      res.status(400).json({
+        message: "Oops! We can't find that course"
+      })
+    }
+  }));
 
+// post route to create new user
+// requires firstName, lastName, emailAddress (unique), password 
 router.post(
   "/users", [check("firstName")
     .exists({
@@ -141,11 +165,13 @@ router.post(
       const user = req.body;
       user.password = bcryptjs.hashSync(user.password);
       await User.create(user);
-      res.status(200).end();
+      res.status(201).location('/').end();
     }
   })
 );
 
+// post route to create new course, requires authentication
+// requires title and description
 router.post(
   "/courses", authenticateUser, [check("title")
     .exists({
@@ -170,13 +196,15 @@ router.post(
     } else {
       const course = req.body;
       await Course.create(course);
-      res.status(201).end();
+      res.status(201).location('/').end();
     }
 
   })
 );
 
-
+// put route to update course
+// must be logged in as the owner of the course
+// requires title and desription
 router.put(
   "/courses/:id", authenticateUser, [check("title")
     .exists({
@@ -199,27 +227,69 @@ router.put(
         errorMessages
       })
     } else {
-
-      const course = await Course.update(req.body, {
+      const user = req.currentUser;
+      const course = await Course.findAll({
         where: {
           id: req.params.id,
         },
       });
-      res.status(204).end();
+
+      if (course.length > 0) {
+        if (user.id === course[0].dataValues.userId) {
+          await Course.update(req.body, {
+            where: {
+              id: req.params.id,
+            }
+          })
+          res.status(204).end();
+        } else {
+          res.status(403).json({
+            message: "Oops! It looks like you do not own that course"
+          })
+        }
+      } else {
+        res.status(400).json({
+          message: "Oops! We can't find that course"
+        })
+      }
+
+
     }
 
   })
 );
 
+// delete route to delete a course
+// must be logged in as the owner of the course in order to delete
 router.delete(
   "/courses/:id", authenticateUser,
   asyncHandler(async (req, res) => {
-    const course = await Course.destroy({
+    const user = req.currentUser;
+    const course = await Course.findAll({
       where: {
         id: req.params.id,
       },
     });
-    res.status(204).end();
+
+    if (course.length > 0) {
+      if (user.id === course[0].dataValues.userId) {
+        const course = await Course.destroy({
+          where: {
+            id: req.params.id,
+          },
+        });
+        res.status(204).end();
+      } else {
+        res.status(403).json({
+          message: "Oops! It looks like you do not own that course"
+        })
+      }
+    } else {
+      res.status(403).json({
+        message: "Oops! We can't find that course"
+      })
+    }
+
   })
 );
 
