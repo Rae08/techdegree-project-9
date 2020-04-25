@@ -195,8 +195,8 @@ router.post(
       })
     } else {
       const course = req.body;
-      await Course.create(course);
-      res.status(201).location('/').end();
+      const newCourse = await Course.create(course);
+      res.status(201).location(`/api/course/${newCourse.id}`).end();
     }
 
   })
